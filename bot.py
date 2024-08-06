@@ -33,7 +33,6 @@ for _ in range(100):
     for i in range(40):
         
         try:
-           
             clean_screen = ImageGrab.grab(bbox =(x,y,x+w,y+h))
             mean = np.mean(clean_screen)
             diff = average[-1] - mean
