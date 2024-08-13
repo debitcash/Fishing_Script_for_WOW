@@ -4,61 +4,72 @@ import cv2
 from PIL import ImageGrab
 import numpy as np
 
-average=[0,]
+average=[0]
 
-template = cv2.imread('template.png', 0)
-w, h = template.shape[::-1]
+# Load float image in greyscale mode
+floatGreyNp = cv2.imread('float.png', 0)
+cv2.imwrite('greyFloat.png', floatGreyNp)
+h, w = floatGreyNp.shape
 
-for _ in range(100):
+# Perform 10 attempts
+for k in range(1, 11):
+    x=0
+    y=0
+    print('Attempt:', k, '/', 10)
     
-    # move mouse and click on fishing
-    time.sleep(1)
-    pyautogui.moveTo(240,710)
-    time.sleep(0.5)
-    pyautogui.mouseDown()
-    time.sleep(0.4)
-    pyautogui.mouseUp()
-    time.sleep(3)
-    
-    #cut out the focus area and transmog it
-    base_screen= ImageGrab.grab(bbox =(0,0,800,450))
-    base_screen.save('///Wow fishing bot/base_screen.png')
-    img_rgb = cv2.imread('base_screen.png')
-    img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_BGR2GRAY)
-    
-    #compare images
-    res = cv2.matchTemplate(img_gray, template, cv2.TM_CCOEFF_NORMED)
-    loc= np.where(res >=0.7)
-    
-    for i in range(40):
+    # Activate fishing skill
+    pyautogui.press('2')
+    time.sleep(2)
+
+    # Take a screenshot and convert it to greyscale
+    base_screen= ImageGrab.grab()
+    base_screen.save('screenshot.png')
+    screenshotGreyNp = cv2.imread('screenshot.png', 0)
         
-        try:
-            clean_screen = ImageGrab.grab(bbox =(x,y,x+w,y+h))
-            mean = np.mean(clean_screen)
-            diff = average[-1] - mean
-            print(diff)
-            
-            # taking poplavok out
-            if 1<= diff:
-                
-                pyautogui.moveTo(x+15 , y+15 )
-                print('waiting to cath')
-                pyautogui.click(button='right') 
-                time.sleep(2)
-                pyautogui.mouseUp()
-                break
-            average.append(mean)
-                
-        except:
-            #location of bait
-            print('cant find the small image')
-            for pt in zip(*loc[::-1]):
-                x = int(pt[0])
-                y = int(pt[1])
-            time.sleep(0.2)
-     
+    # Use normalized cross-correlation for template matching
+    res = cv2.matchTemplate(screenshotGreyNp, floatGreyNp, cv2.TM_CCOEFF_NORMED)
+
+    # Find locations where the correlation coefficient is above the threshold
+    floatLocation= np.where(res >= 0.7)
+
+    # Skip iteration if float was not found
+    if not floatLocation[0].size:
+        print('cant find the float')
+        continue
+
+    # Get the location of the first match
+    for coordinates in zip(*floatLocation[::-1]):
+            x = int(coordinates[0])
+            y = int(coordinates[1])
+
+    # Monitor the area around the detected float
+    for h in range(0,20):
+        # Capture the float picture from the screen
+        capturedFloatGreyNp = ImageGrab.grab(bbox =(x, y, x + w, y + h)).convert('L')
+        
+        # Calculate the average pixel value of the captured float area
+        mean = np.mean(capturedFloatGreyNp)
+
+        # Find the difference between previously recorded average and the one that was jsut calculated
+        # i.e. how different does the float area look like comparing to few moments ago(0.3 secs ago)
+        diff = average[-1] - mean
+        time.sleep(0.3)
+        average.append(mean)
+
+        # If the difference exceeds the threshold, a bait is detected
+        if diff > 5:
+            # Take the fish out and reset the position of cursor
+            print('Bite detected!')
+            pyautogui.moveTo(x + 5 , y + 5)
+            pyautogui.keyDown('shift')
+            pyautogui.click(button='right')
+            pyautogui.mouseUp()
+            pyautogui.keyUp('shift')
+            pyautogui.moveTo(100, 100)
+            success +=1
+            break   
+    
     #null the info after iteration
-    pyautogui.moveTo(400,400)
     try:
         del(x)
         del(y)
